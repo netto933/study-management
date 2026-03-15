@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <meta charset="UTF-8">
 <title>学習管理</title>
 
@@ -12,130 +13,157 @@
 
 body{
 font-family:sans-serif;
-max-width:700px;
+max-width:720px;
 margin:auto;
-padding:20px;
-background:#f4f4f4;
+padding:15px;
+background:#f0f2f5;
 }
 
 h1{
 text-align:center;
 }
 
-.section{
+.card{
 background:white;
 padding:15px;
-border-radius:8px;
-margin-top:20px;
+border-radius:10px;
+margin-top:15px;
+box-shadow:0 2px 5px rgba(0,0,0,0.1);
 }
 
 button{
 padding:6px 10px;
-margin:4px;
+margin:3px;
+border-radius:6px;
+border:none;
+background:#4CAF50;
+color:white;
 }
 
-input{
+button.delete{
+background:#e74c3c;
+}
+
+input,select{
 padding:6px;
+margin:3px;
 }
 
-.category{
+.task{
 display:flex;
+align-items:center;
 justify-content:space-between;
-margin:5px 0;
+padding:5px 0;
 }
 
-.timer{
-font-size:24px;
-margin:10px 0;
+.done{
+text-decoration:line-through;
+color:gray;
+}
+
+.historyItem{
+border-bottom:1px solid #ddd;
+padding:4px;
 }
 
 </style>
+
 </head>
 
 <body>
 
 <h1>学習管理</h1>
 
-<div class="section">
+<div class="card">
 
-<h3>カテゴリ</h3>
+<h3>カテゴリ管理</h3>
 
-<input id="catInput" placeholder="カテゴリ名">
+<input id="catInput" placeholder="カテゴリ">
+
 <button onclick="addCategory()">追加</button>
 
 <div id="catList"></div>
 
 </div>
 
-<div class="section">
+<div class="card">
 
-<h3>学習開始</h3>
+<h3>タスク追加</h3>
 
-<div id="startButtons"></div>
+<select id="catSelect"></select>
 
-<div class="timer" id="timer">0:00</div>
+<input id="taskInput" placeholder="タスク">
 
-<button onclick="stopStudy()">学習終了</button>
-
-</div>
-
-<div class="section">
-
-<h3>今日の履歴</h3>
-
-<div id="todayLog"></div>
+<button onclick="addTask()">追加</button>
 
 </div>
 
-<div class="section">
+<div class="card">
 
-<h3>今週の学習時間</h3>
+<h3>今日のタスク</h3>
+
+<div id="taskList"></div>
+
+<p id="progress"></p>
+
+</div>
+
+<div class="card">
+
+<h3>カテゴリ達成率</h3>
 
 <canvas id="chart"></canvas>
 
 </div>
 
-<div class="section">
+<div class="card">
 
-<h3>データ</h3>
+<h3>履歴</h3>
+
+<div id="history"></div>
+
+<button class="delete" onclick="clearHistory()">履歴削除</button>
+
+</div>
+
+<div class="card">
+
+<h3>データ管理</h3>
 
 <button onclick="backup()">バックアップ</button>
 
 <input type="file" id="restoreFile">
+
 <button onclick="restore()">復元</button>
 
 </div>
 
 <script>
 
-const CAT_KEY="learning_categories";
-const SESS_KEY="learning_sessions";
+const CAT_KEY="learning_categories_v5";
+const TASK_KEY="learning_tasks_v5";
 
 let categories=JSON.parse(localStorage.getItem(CAT_KEY))||[];
-let sessions=JSON.parse(localStorage.getItem(SESS_KEY))||[];
 
-let currentCategory=null;
-let startTime=null;
-let timer=null;
+let tasks=JSON.parse(localStorage.getItem(TASK_KEY))||[];
 
 function save(){
 
 localStorage.setItem(CAT_KEY,JSON.stringify(categories));
-localStorage.setItem(SESS_KEY,JSON.stringify(sessions));
+
+localStorage.setItem(TASK_KEY,JSON.stringify(tasks));
 
 }
 
 function addCategory(){
 
-let input=document.getElementById("catInput");
-
-let name=input.value.trim();
+let name=document.getElementById("catInput").value.trim();
 
 if(!name)return;
 
 categories.push(name);
 
-input.value="";
+document.getElementById("catInput").value="";
 
 save();
 
@@ -145,7 +173,59 @@ render();
 
 function deleteCategory(i){
 
+let name=categories[i];
+
 categories.splice(i,1);
+
+tasks=tasks.filter(t=>t.category!==name);
+
+save();
+
+render();
+
+}
+
+function addTask(){
+
+let text=document.getElementById("taskInput").value.trim();
+
+let cat=document.getElementById("catSelect").value;
+
+if(!text)return;
+
+tasks.push({
+
+text:text,
+
+category:cat,
+
+done:false,
+
+date:new Date().toDateString()
+
+});
+
+document.getElementById("taskInput").value="";
+
+save();
+
+render();
+
+}
+
+function toggleTask(i){
+
+tasks[i].done=!tasks[i].done;
+
+save();
+
+render();
+
+}
+
+function deleteTask(i){
+
+tasks.splice(i,1);
 
 save();
 
@@ -159,159 +239,147 @@ let div=document.getElementById("catList");
 
 div.innerHTML="";
 
-categories.forEach((cat,i)=>{
+categories.forEach((c,i)=>{
 
 let d=document.createElement("div");
 
-d.className="category";
-
-d.innerHTML=cat+" <button onclick='deleteCategory("+i+")'>削除</button>";
+d.innerHTML=c+" <button class='delete' onclick='deleteCategory("+i+")'>削除</button>";
 
 div.appendChild(d);
 
 });
 
-}
+let sel=document.getElementById("catSelect");
 
-function renderStartButtons(){
+sel.innerHTML="";
 
-let div=document.getElementById("startButtons");
+categories.forEach(c=>{
 
-div.innerHTML="";
+let o=document.createElement("option");
 
-categories.forEach(cat=>{
+o.value=c;
 
-let b=document.createElement("button");
+o.textContent=c;
 
-b.textContent="▶ "+cat;
-
-b.onclick=function(){startStudy(cat)};
-
-div.appendChild(b);
+sel.appendChild(o);
 
 });
 
 }
 
-function startStudy(cat){
+function renderTasks(){
 
-currentCategory=cat;
-
-startTime=Date.now();
-
-if(timer)clearInterval(timer);
-
-timer=setInterval(updateTimer,1000);
-
-}
-
-function updateTimer(){
-
-let sec=Math.floor((Date.now()-startTime)/1000);
-
-let m=Math.floor(sec/60);
-
-let s=sec%60;
-
-document.getElementById("timer").textContent=m+":"+s.toString().padStart(2,"0");
-
-}
-
-function stopStudy(){
-
-if(!startTime)return;
-
-let duration=Math.floor((Date.now()-startTime)/1000);
-
-sessions.push({
-
-category:currentCategory,
-
-duration:duration,
-
-date:new Date().toISOString()
-
-});
-
-startTime=null;
-
-clearInterval(timer);
-
-timer=null;
-
-document.getElementById("timer").textContent="0:00";
-
-save();
-
-render();
-
-}
-
-function renderToday(){
-
-let div=document.getElementById("todayLog");
+let div=document.getElementById("taskList");
 
 div.innerHTML="";
 
 let today=new Date().toDateString();
 
-sessions.forEach(s=>{
+let todayTasks=tasks.filter(t=>t.date===today);
 
-if(new Date(s.date).toDateString()==today){
+todayTasks.forEach((t,i)=>{
 
-let m=Math.floor(s.duration/60);
+let index=tasks.indexOf(t);
 
-let p=document.createElement("p");
+let row=document.createElement("div");
 
-p.textContent=s.category+" "+m+"分";
+row.className="task";
 
-div.appendChild(p);
+let left=document.createElement("div");
 
-}
+let check=document.createElement("input");
+
+check.type="checkbox";
+
+check.checked=t.done;
+
+check.onclick=()=>toggleTask(index);
+
+let span=document.createElement("span");
+
+span.textContent=" ["+t.category+"] "+t.text;
+
+if(t.done)span.className="done";
+
+left.appendChild(check);
+
+left.appendChild(span);
+
+let del=document.createElement("button");
+
+del.textContent="削除";
+
+del.className="delete";
+
+del.onclick=()=>deleteTask(index);
+
+row.appendChild(left);
+
+row.appendChild(del);
+
+div.appendChild(row);
 
 });
 
-}
+let done=todayTasks.filter(t=>t.done).length;
 
-function weekData(){
+let percent=0;
 
-let data={};
+if(todayTasks.length>0){
 
-categories.forEach(c=>data[c]=0);
-
-let weekAgo=Date.now()-7*24*3600*1000;
-
-sessions.forEach(s=>{
-
-let t=new Date(s.date).getTime();
-
-if(t>weekAgo){
-
-data[s.category]+=s.duration;
+percent=Math.round(done/todayTasks.length*100);
 
 }
 
-});
-
-return data;
+document.getElementById("progress").textContent="今日の達成率 "+percent+"%";
 
 }
-
-let chart;
 
 function renderChart(){
 
-let d=weekData();
+let data={};
 
-let labels=Object.keys(d);
+categories.forEach(c=>data[c]={done:0,total:0});
 
-let vals=labels.map(k=>Math.floor(d[k]/60));
+let today=new Date().toDateString();
+
+tasks.forEach(t=>{
+
+if(t.date===today){
+
+if(!data[t.category])return;
+
+data[t.category].total++;
+
+if(t.done)data[t.category].done++;
+
+}
+
+});
+
+let labels=[];
+
+let values=[];
+
+for(let c in data){
+
+labels.push(c);
+
+let v=0;
+
+if(data[c].total>0){
+
+v=Math.round(data[c].done/data[c].total*100);
+
+}
+
+values.push(v);
+
+}
 
 let ctx=document.getElementById("chart");
 
-if(chart)chart.destroy();
-
-chart=new Chart(ctx,{
+new Chart(ctx,{
 
 type:"bar",
 
@@ -321,9 +389,9 @@ labels:labels,
 
 datasets:[{
 
-label:"分",
+label:"達成率%",
 
-data:vals
+data:values
 
 }]
 
@@ -333,11 +401,57 @@ data:vals
 
 }
 
+function renderHistory(){
+
+let div=document.getElementById("history");
+
+div.innerHTML="";
+
+let days={};
+
+tasks.forEach(t=>{
+
+if(!days[t.date])days[t.date]=[];
+
+days[t.date].push(t);
+
+});
+
+for(let d in days){
+
+let arr=days[d];
+
+let done=arr.filter(t=>t.done).length;
+
+let p=Math.round(done/arr.length*100);
+
+let item=document.createElement("div");
+
+item.className="historyItem";
+
+item.textContent=d+"　達成率 "+p+"%";
+
+div.appendChild(item);
+
+}
+
+}
+
+function clearHistory(){
+
+if(!confirm("履歴削除しますか？"))return;
+
+tasks=[];
+
+save();
+
+render();
+
+}
+
 function backup(){
 
-let data={categories,sessions};
-
-let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+let blob=new Blob([JSON.stringify({categories,tasks},null,2)],{type:"application/json"});
 
 let a=document.createElement("a");
 
@@ -363,7 +477,7 @@ let d=JSON.parse(e.target.result);
 
 categories=d.categories||[];
 
-sessions=d.sessions||[];
+tasks=d.tasks||[];
 
 save();
 
@@ -379,21 +493,24 @@ function render(){
 
 renderCategories();
 
-renderStartButtons();
-
-renderToday();
+renderTasks();
 
 renderChart();
+
+renderHistory();
 
 }
 
 render();
 
 if ("serviceWorker" in navigator) {
+
 navigator.serviceWorker.register("service-worker.js");
+
 }
 
 </script>
 
 </body>
+
 </html>
