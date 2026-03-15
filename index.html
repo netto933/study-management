@@ -2,28 +2,30 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>勉強ToDo</title>
+<title>学習管理</title>
 
 <style>
+
 body{
 font-family:sans-serif;
-max-width:600px;
+max-width:700px;
 margin:auto;
 padding:20px;
-background:#f5f5f5;
+background:#f4f4f4;
 }
 
 h1{
 text-align:center;
 }
 
-input{
+input,select{
 padding:8px;
+margin:4px;
 }
 
 button{
 padding:6px 10px;
-margin-left:5px;
+margin:4px;
 }
 
 li{
@@ -32,8 +34,8 @@ margin:6px 0;
 padding:10px;
 border-radius:6px;
 display:flex;
-align-items:center;
 justify-content:space-between;
+align-items:center;
 }
 
 .completed span{
@@ -41,16 +43,11 @@ text-decoration:line-through;
 color:gray;
 }
 
-#progress{
-margin-top:20px;
-font-weight:bold;
-}
-
-.timer{
-margin-top:20px;
+.section{
 background:white;
 padding:10px;
 border-radius:6px;
+margin-top:20px;
 }
 
 </style>
@@ -58,20 +55,37 @@ border-radius:6px;
 
 <body>
 
-<h1>今日の勉強ToDo</h1>
+<h1>学習管理</h1>
 
-<input id="todoInput" placeholder="勉強タスクを書く">
-<button onclick="addTodo()">追加</button>
+<div class="section">
 
-<ul id="todoList"></ul>
+<h3>カテゴリ追加</h3>
+
+<input id="categoryInput" placeholder="例: Excel">
+<button onclick="addCategory()">追加</button>
+
+<select id="categorySelect"></select>
+
+</div>
+
+<div class="section">
+
+<h3>学習タスク</h3>
+
+<input id="taskInput" placeholder="例: ピボット復習">
+<button onclick="addTask()">追加</button>
+
+<ul id="taskList"></ul>
 
 <div id="progress">達成率: 0%</div>
 
-<div class="timer">
+</div>
 
-<h3>勉強タイマー</h3>
+<div class="section">
 
-<div id="time">0:00</div>
+<h3>学習タイマー</h3>
+
+<div id="timerDisplay">0:00</div>
 
 <button onclick="startTimer()">開始</button>
 <button onclick="stopTimer()">停止</button>
@@ -79,26 +93,95 @@ border-radius:6px;
 
 </div>
 
+<div class="section">
+
+<h3>学習時間</h3>
+
+<div id="studyStats"></div>
+
+</div>
+
 <script>
 
-let todos = JSON.parse(localStorage.getItem("todos")) || [];
+let categories=JSON.parse(localStorage.getItem("categories"))||[];
+let tasks=JSON.parse(localStorage.getItem("tasks"))||[];
+let studyTime=JSON.parse(localStorage.getItem("studyTime"))||{};
 
 function save(){
-localStorage.setItem("todos",JSON.stringify(todos));
+
+localStorage.setItem("categories",JSON.stringify(categories));
+localStorage.setItem("tasks",JSON.stringify(tasks));
+localStorage.setItem("studyTime",JSON.stringify(studyTime));
+
 }
 
-function render(){
+function updateCategorySelect(){
 
-let list=document.getElementById("todoList");
+let select=document.getElementById("categorySelect");
+select.innerHTML="";
+
+categories.forEach(cat=>{
+let option=document.createElement("option");
+option.value=cat;
+option.textContent=cat;
+select.appendChild(option);
+});
+
+}
+
+function addCategory(){
+
+let input=document.getElementById("categoryInput");
+let name=input.value.trim();
+
+if(name==="")return;
+
+categories.push(name);
+
+if(!studyTime[name]){
+studyTime[name]=0;
+}
+
+input.value="";
+
+save();
+updateCategorySelect();
+renderStats();
+
+}
+
+function addTask(){
+
+let text=document.getElementById("taskInput").value.trim();
+let cat=document.getElementById("categorySelect").value;
+
+if(text==="")return;
+
+tasks.push({
+text:text,
+category:cat,
+done:false
+});
+
+document.getElementById("taskInput").value="";
+
+save();
+renderTasks();
+
+}
+
+function renderTasks(){
+
+let list=document.getElementById("taskList");
 list.innerHTML="";
 
 let completed=0;
 
-todos.forEach((todo,index)=>{
+tasks.forEach((task,index)=>{
 
 let li=document.createElement("li");
 
-if(todo.done){
+if(task.done){
 li.classList.add("completed");
 completed++;
 }
@@ -107,16 +190,30 @@ let left=document.createElement("div");
 
 let checkbox=document.createElement("input");
 checkbox.type="checkbox";
-checkbox.checked=todo.done;
+checkbox.checked=task.done;
 
 checkbox.onchange=function(){
-todos[index].done=this.checked;
+
+tasks[index].done=this.checked;
+
+if(this.checked){
+
+let cat=task.category;
+
+studyTime[cat]+=seconds;
+
+resetTimer();
+
+}
+
 save();
-render();
+renderTasks();
+renderStats();
+
 };
 
 let text=document.createElement("span");
-text.textContent=" "+todo.text;
+text.textContent=" ["+task.category+"] "+task.text;
 
 left.appendChild(checkbox);
 left.appendChild(text);
@@ -125,9 +222,12 @@ let del=document.createElement("button");
 del.textContent="削除";
 
 del.onclick=function(){
-todos.splice(index,1);
+
+tasks.splice(index,1);
+
 save();
-render();
+renderTasks();
+
 };
 
 li.appendChild(left);
@@ -138,31 +238,34 @@ list.appendChild(li);
 });
 
 let percent=0;
-if(todos.length>0){
-percent=Math.round(completed/todos.length*100);
+
+if(tasks.length>0){
+percent=Math.round(completed/tasks.length*100);
 }
 
 document.getElementById("progress").textContent="達成率: "+percent+"%";
 
 }
 
-function addTodo(){
+function renderStats(){
 
-let input=document.getElementById("todoInput");
-let text=input.value.trim();
+let div=document.getElementById("studyStats");
 
-if(text==="") return;
+div.innerHTML="";
 
-todos.push({text:text,done:false});
+for(let cat in studyTime){
 
-input.value="";
+let min=Math.floor(studyTime[cat]/60);
 
-save();
-render();
+let p=document.createElement("p");
+
+p.textContent=cat+" : "+min+"分";
+
+div.appendChild(p);
 
 }
 
-render();
+}
 
 let seconds=0;
 let timer=null;
@@ -172,17 +275,19 @@ function updateTimer(){
 let min=Math.floor(seconds/60);
 let sec=seconds%60;
 
-document.getElementById("time").textContent=min+":"+sec.toString().padStart(2,"0");
+document.getElementById("timerDisplay").textContent=min+":"+sec.toString().padStart(2,"0");
 
 }
 
 function startTimer(){
 
-if(timer!==null) return;
+if(timer)return;
 
 timer=setInterval(function(){
+
 seconds++;
 updateTimer();
+
 },1000);
 
 }
@@ -202,7 +307,9 @@ updateTimer();
 
 }
 
-updateTimer();
+updateCategorySelect();
+renderTasks();
+renderStats();
 
 </script>
 
