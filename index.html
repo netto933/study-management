@@ -7,7 +7,7 @@
 <style>
 body{
 font-family:sans-serif;
-max-width:500px;
+max-width:600px;
 margin:auto;
 padding:20px;
 background:#f5f5f5;
@@ -17,23 +17,26 @@ h1{
 text-align:center;
 }
 
-#todoInput{
-width:70%;
+input{
 padding:8px;
 }
 
 button{
-padding:8px;
+padding:6px 10px;
+margin-left:5px;
 }
 
 li{
 background:white;
-margin:5px 0;
-padding:8px;
-border-radius:5px;
+margin:6px 0;
+padding:10px;
+border-radius:6px;
+display:flex;
+align-items:center;
+justify-content:space-between;
 }
 
-.completed{
+.completed span{
 text-decoration:line-through;
 color:gray;
 }
@@ -42,6 +45,14 @@ color:gray;
 margin-top:20px;
 font-weight:bold;
 }
+
+.timer{
+margin-top:20px;
+background:white;
+padding:10px;
+border-radius:6px;
+}
+
 </style>
 </head>
 
@@ -55,6 +66,18 @@ font-weight:bold;
 <ul id="todoList"></ul>
 
 <div id="progress">達成率: 0%</div>
+
+<div class="timer">
+
+<h3>勉強タイマー</h3>
+
+<div id="time">0:00</div>
+
+<button onclick="startTimer()">開始</button>
+<button onclick="stopTimer()">停止</button>
+<button onclick="resetTimer()">リセット</button>
+
+</div>
 
 <script>
 
@@ -75,6 +98,13 @@ todos.forEach((todo,index)=>{
 
 let li=document.createElement("li");
 
+if(todo.done){
+li.classList.add("completed");
+completed++;
+}
+
+let left=document.createElement("div");
+
 let checkbox=document.createElement("input");
 checkbox.type="checkbox";
 checkbox.checked=todo.done;
@@ -83,19 +113,25 @@ checkbox.onchange=function(){
 todos[index].done=this.checked;
 save();
 render();
-}
-
-if(todo.done){
-li.classList.add("completed");
-completed++;
-}
-
-li.appendChild(checkbox);
+};
 
 let text=document.createElement("span");
 text.textContent=" "+todo.text;
 
-li.appendChild(text);
+left.appendChild(checkbox);
+left.appendChild(text);
+
+let del=document.createElement("button");
+del.textContent="削除";
+
+del.onclick=function(){
+todos.splice(index,1);
+save();
+render();
+};
+
+li.appendChild(left);
+li.appendChild(del);
 
 list.appendChild(li);
 
@@ -127,6 +163,46 @@ render();
 }
 
 render();
+
+let seconds=0;
+let timer=null;
+
+function updateTimer(){
+
+let min=Math.floor(seconds/60);
+let sec=seconds%60;
+
+document.getElementById("time").textContent=min+":"+sec.toString().padStart(2,"0");
+
+}
+
+function startTimer(){
+
+if(timer!==null) return;
+
+timer=setInterval(function(){
+seconds++;
+updateTimer();
+},1000);
+
+}
+
+function stopTimer(){
+
+clearInterval(timer);
+timer=null;
+
+}
+
+function resetTimer(){
+
+stopTimer();
+seconds=0;
+updateTimer();
+
+}
+
+updateTimer();
 
 </script>
 
