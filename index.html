@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <title>学習管理</title>
 
+<link rel="manifest" href="manifest.json">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 
 body{
@@ -18,9 +22,11 @@ h1{
 text-align:center;
 }
 
-input,select{
-padding:8px;
-margin:4px;
+.section{
+background:white;
+padding:15px;
+border-radius:8px;
+margin-top:20px;
 }
 
 button{
@@ -28,26 +34,19 @@ padding:6px 10px;
 margin:4px;
 }
 
-li{
-background:white;
-margin:6px 0;
-padding:10px;
-border-radius:6px;
+input{
+padding:6px;
+}
+
+.category{
 display:flex;
 justify-content:space-between;
-align-items:center;
+margin:5px 0;
 }
 
-.completed span{
-text-decoration:line-through;
-color:gray;
-}
-
-.section{
-background:white;
-padding:10px;
-border-radius:6px;
-margin-top:20px;
+.timer{
+font-size:24px;
+margin:10px 0;
 }
 
 </style>
@@ -59,290 +58,298 @@ margin-top:20px;
 
 <div class="section">
 
-<h3>カテゴリ追加</h3>
+<h3>カテゴリ</h3>
 
-<input id="categoryInput" placeholder="例: Excel">
+<input id="catInput" placeholder="カテゴリ名">
 <button onclick="addCategory()">追加</button>
 
-<select id="categorySelect"></select>
+<div id="catList"></div>
 
 </div>
 
 <div class="section">
 
-<h3>学習タスク</h3>
+<h3>学習開始</h3>
 
-<input id="taskInput" placeholder="例: ピボット復習">
-<button onclick="addTask()">追加</button>
+<div id="startButtons"></div>
 
-<ul id="taskList"></ul>
+<div class="timer" id="timer">0:00</div>
 
-<div id="progress">達成率: 0%</div>
-
-</div>
-
-<div class="section">
-
-<h3>学習タイマー</h3>
-
-<div id="timerDisplay">0:00</div>
-
-<button onclick="startTimer()">開始</button>
-<button onclick="stopTimer()">停止</button>
-<button onclick="resetTimer()">リセット</button>
+<button onclick="stopStudy()">学習終了</button>
 
 </div>
 
 <div class="section">
 
-<h3>学習時間</h3>
+<h3>今日の履歴</h3>
 
-<div id="studyStats"></div>
+<div id="todayLog"></div>
 
-<div class="card">
+</div>
 
-<p>データのバックアップ</p>
+<div class="section">
 
-<button onclick="backupData()">バックアップ</button>
+<h3>今週の学習時間</h3>
+
+<canvas id="chart"></canvas>
+
+</div>
+
+<div class="section">
+
+<h3>データ</h3>
+
+<button onclick="backup()">バックアップ</button>
 
 <input type="file" id="restoreFile">
-
-<button onclick="restoreData()">復元</button>
-
-</div>
+<button onclick="restore()">復元</button>
 
 </div>
 
 <script>
 
-let learning_categories=JSON.parse(localStorage.getItem("learning_categories"))||[];
-let learning_tasks=JSON.parse(localStorage.getItem("learning_tasks"))||[];
-let learning_studyTime=JSON.parse(localStorage.getItem("learning_studyTime"))||{};
+const CAT_KEY="learning_categories";
+const SESS_KEY="learning_sessions";
+
+let categories=JSON.parse(localStorage.getItem(CAT_KEY))||[];
+let sessions=JSON.parse(localStorage.getItem(SESS_KEY))||[];
+
+let currentCategory=null;
+let startTime=null;
+let timer=null;
 
 function save(){
 
-localStorage.setItem("learning_categories",JSON.stringify(categories));
-localStorage.setItem("learning_tasks",JSON.stringify(tasks));
-localStorage.setItem("learning_studyTime",JSON.stringify(studyTime));
-
-}
-
-function updateCategorySelect(){
-
-let select=document.getElementById("categorySelect");
-select.innerHTML="";
-
-categories.forEach(cat=>{
-let option=document.createElement("option");
-option.value=cat;
-option.textContent=cat;
-select.appendChild(option);
-});
+localStorage.setItem(CAT_KEY,JSON.stringify(categories));
+localStorage.setItem(SESS_KEY,JSON.stringify(sessions));
 
 }
 
 function addCategory(){
 
-let input=document.getElementById("categoryInput");
+let input=document.getElementById("catInput");
+
 let name=input.value.trim();
 
-if(name==="")return;
+if(!name)return;
 
 categories.push(name);
-
-if(!studyTime[name]){
-studyTime[name]=0;
-}
 
 input.value="";
 
 save();
-updateCategorySelect();
-renderStats();
+
+render();
 
 }
 
-function addTask(){
+function deleteCategory(i){
 
-let text=document.getElementById("learning_taskInput").value.trim();
-let cat=document.getElementById("learning_categorySelect").value;
-
-if(text==="")return;
-
-tasks.push({
-text:text,
-category:cat,
-done:false
-});
-
-document.getElementById("taskInput").value="";
+categories.splice(i,1);
 
 save();
-renderTasks();
+
+render();
 
 }
 
-function renderTasks(){
+function renderCategories(){
 
-let list=document.getElementById("taskList");
-list.innerHTML="";
-
-let completed=0;
-
-tasks.forEach((task,index)=>{
-
-let li=document.createElement("li");
-
-if(task.done){
-li.classList.add("completed");
-completed++;
-}
-
-let left=document.createElement("div");
-
-let checkbox=document.createElement("input");
-checkbox.type="checkbox";
-checkbox.checked=task.done;
-
-checkbox.onchange=function(){
-
-tasks[index].done=this.checked;
-
-if(this.checked){
-
-let cat=learning_task.learning_category;
-
-studyTime[cat]+=seconds;
-
-resetTimer();
-
-}
-
-save();
-renderTasks();
-renderStats();
-
-};
-
-let text=document.createElement("span");
-text.textContent=" ["+task.category+"] "+task.text;
-
-left.appendChild(checkbox);
-left.appendChild(text);
-
-let del=document.createElement("button");
-del.textContent="削除";
-
-del.onclick=function(){
-
-learning_tasks.splice(index,1);
-
-save();
-renderTasks();
-
-};
-
-li.appendChild(left);
-li.appendChild(del);
-
-list.appendChild(li);
-
-});
-
-let percent=0;
-
-if(tasks.length>0){
-percent=Math.round(completed/tasks.length*100);
-}
-
-document.getElementById("progress").textContent="達成率: "+percent+"%";
-
-}
-
-function renderStats(){
-
-let div=document.getElementById("studyStats");
+let div=document.getElementById("catList");
 
 div.innerHTML="";
 
-for(let cat in studyTime){
+categories.forEach((cat,i)=>{
 
-let min=Math.floor(studyTime[cat]/60);
+let d=document.createElement("div");
+
+d.className="category";
+
+d.innerHTML=cat+" <button onclick='deleteCategory("+i+")'>削除</button>";
+
+div.appendChild(d);
+
+});
+
+}
+
+function renderStartButtons(){
+
+let div=document.getElementById("startButtons");
+
+div.innerHTML="";
+
+categories.forEach(cat=>{
+
+let b=document.createElement("button");
+
+b.textContent="▶ "+cat;
+
+b.onclick=function(){startStudy(cat)};
+
+div.appendChild(b);
+
+});
+
+}
+
+function startStudy(cat){
+
+currentCategory=cat;
+
+startTime=Date.now();
+
+if(timer)clearInterval(timer);
+
+timer=setInterval(updateTimer,1000);
+
+}
+
+function updateTimer(){
+
+let sec=Math.floor((Date.now()-startTime)/1000);
+
+let m=Math.floor(sec/60);
+
+let s=sec%60;
+
+document.getElementById("timer").textContent=m+":"+s.toString().padStart(2,"0");
+
+}
+
+function stopStudy(){
+
+if(!startTime)return;
+
+let duration=Math.floor((Date.now()-startTime)/1000);
+
+sessions.push({
+
+category:currentCategory,
+
+duration:duration,
+
+date:new Date().toISOString()
+
+});
+
+startTime=null;
+
+clearInterval(timer);
+
+timer=null;
+
+document.getElementById("timer").textContent="0:00";
+
+save();
+
+render();
+
+}
+
+function renderToday(){
+
+let div=document.getElementById("todayLog");
+
+div.innerHTML="";
+
+let today=new Date().toDateString();
+
+sessions.forEach(s=>{
+
+if(new Date(s.date).toDateString()==today){
+
+let m=Math.floor(s.duration/60);
 
 let p=document.createElement("p");
 
-p.textContent=cat+" : "+min+"分";
+p.textContent=s.category+" "+m+"分";
 
 div.appendChild(p);
 
 }
 
-}
-
-let seconds=0;
-let timer=null;
-
-function updateTimer(){
-
-let min=Math.floor(seconds/60);
-let sec=seconds%60;
-
-document.getElementById("timerDisplay").textContent=min+":"+sec.toString().padStart(2,"0");
+});
 
 }
 
-function startTimer(){
+function weekData(){
 
-if(timer)return;
+let data={};
 
-timer=setInterval(function(){
+categories.forEach(c=>data[c]=0);
 
-seconds++;
-updateTimer();
+let weekAgo=Date.now()-7*24*3600*1000;
 
-},1000);
+sessions.forEach(s=>{
 
-}
+let t=new Date(s.date).getTime();
 
-function stopTimer(){
+if(t>weekAgo){
 
-clearInterval(timer);
-timer=null;
+data[s.category]+=s.duration;
 
 }
 
-function resetTimer(){
+});
 
-stopTimer();
-seconds=0;
-updateTimer();
+return data;
 
 }
 
+let chart;
 
-function backupData(){
+function renderChart(){
 
-let data={
-learning_categories:learning_categories,
-learning_tasks:learning_tasks,
-learning_studyTime:learning_studyTime
-};
+let d=weekData();
 
-let blob=new Blob(
-[JSON.stringify(data,null,2)],
-{type:"application/json"}
-);
+let labels=Object.keys(d);
+
+let vals=labels.map(k=>Math.floor(d[k]/60));
+
+let ctx=document.getElementById("chart");
+
+if(chart)chart.destroy();
+
+chart=new Chart(ctx,{
+
+type:"bar",
+
+data:{
+
+labels:labels,
+
+datasets:[{
+
+label:"分",
+
+data:vals
+
+}]
+
+}
+
+});
+
+}
+
+function backup(){
+
+let data={categories,sessions};
+
+let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
 
 let a=document.createElement("a");
 
 a.href=URL.createObjectURL(blob);
+
 a.download="learning_backup.json";
 
 a.click();
 
 }
 
-function restoreData(){
+function restore(){
 
 let file=document.getElementById("restoreFile").files[0];
 
@@ -352,26 +359,39 @@ let reader=new FileReader();
 
 reader.onload=function(e){
 
-let data=JSON.parse(e.target.result);
+let d=JSON.parse(e.target.result);
 
-learning_categories=data.learning_categories||[];
-learning_tasks=data.learning_tasks||[];
-learning_studyTime=data.learning_studyTime||{};
+categories=d.categories||[];
+
+sessions=d.sessions||[];
 
 save();
-updateCategorySelect();
-renderTasks();
-renderStats();
+
+render();
 
 };
 
 reader.readAsText(file);
 
 }
-  
-updateCategorySelect();
-renderTasks();
-renderStats();
+
+function render(){
+
+renderCategories();
+
+renderStartButtons();
+
+renderToday();
+
+renderChart();
+
+}
+
+render();
+
+if ("serviceWorker" in navigator) {
+navigator.serviceWorker.register("service-worker.js");
+}
 
 </script>
 
