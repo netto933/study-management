@@ -319,6 +319,56 @@ updateTimer();
 
 }
 
+
+function backupData(){
+
+let data={
+categories:categories,
+tasks:tasks,
+studyTime:studyTime
+};
+
+let blob=new Blob(
+[JSON.stringify(data,null,2)],
+{type:"application/json"}
+);
+
+let a=document.createElement("a");
+
+a.href=URL.createObjectURL(blob);
+a.download="learning_backup.json";
+
+a.click();
+
+}
+
+function restoreData(){
+
+let file=document.getElementById("restoreFile").files[0];
+
+if(!file)return;
+
+let reader=new FileReader();
+
+reader.onload=function(e){
+
+let data=JSON.parse(e.target.result);
+
+categories=data.categories||[];
+tasks=data.tasks||[];
+studyTime=data.studyTime||{};
+
+save();
+updateCategorySelect();
+renderTasks();
+renderStats();
+
+};
+
+reader.readAsText(file);
+
+}
+  
 updateCategorySelect();
 renderTasks();
 renderStats();
