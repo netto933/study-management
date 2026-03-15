@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>学習管理</title>
+
+<link rel="manifest" href="manifest.json">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -13,14 +13,10 @@
 
 body{
 font-family:sans-serif;
-background:#f4f6fb;
-margin:0;
-}
-
-.container{
-max-width:700px;
+max-width:720px;
 margin:auto;
-padding:10px;
+padding:15px;
+background:#f0f2f5;
 }
 
 h1{
@@ -29,97 +25,102 @@ text-align:center;
 
 .card{
 background:white;
-padding:20px;
-margin:12px 0;
-border-radius:16px;
-box-shadow:0 4px 10px rgba(0,0,0,0.08);
+padding:15px;
+border-radius:10px;
+margin-top:15px;
+box-shadow:0 2px 5px rgba(0,0,0,0.1);
 }
 
 button{
+padding:6px 10px;
+margin:3px;
 border:none;
-padding:10px 14px;
-border-radius:10px;
-font-size:16px;
-cursor:pointer;
-}
-
-.add{
+border-radius:6px;
 background:#4CAF50;
 color:white;
 }
 
-.delete{
+button.delete{
 background:#e74c3c;
-color:white;
 }
 
-.plus{
-background:#4CAF50;
-color:white;
-width:40px;
+button.edit{
+background:#3498db;
 }
 
-.minus{
-background:#888;
-color:white;
-width:40px;
+.toggle{
+cursor:pointer;
+font-weight:bold;
 }
 
-input,select{
-padding:8px;
-margin:4px;
-font-size:14px;
-}
-
-.taskRow{
+.task{
 display:flex;
+align-items:center;
 justify-content:space-between;
-align-items:center;
-margin:8px 0;
+margin:5px 0;
 }
 
-.taskButtons{
-display:flex;
-align-items:center;
-gap:6px;
+.done{
+text-decoration:line-through;
+color:gray;
 }
 
 </style>
+
 </head>
 
 <body>
 
-<div class="container">
-
 <h1>学習管理</h1>
 
 <div class="card">
-<h3>今日やるタスク</h3>
-<div id="todayTasks"></div>
+
+<div class="toggle" onclick="toggleCat()">▶ カテゴリ管理</div>
+
+<div id="catSection" style="display:none">
+
+<input id="catInput" placeholder="カテゴリ">
+
+<button onclick="addCategory()">追加</button>
+
+<div id="catList"></div>
+
+</div>
+
 </div>
 
 <div class="card">
 
 <h3>タスク追加</h3>
 
-<select id="category"></select>
+<select id="catSelect"></select>
 
-<input id="taskName" placeholder="タスク">
+<input id="taskInput" placeholder="タスク">
 
-<input id="limit" type="number" min="1" placeholder="回数(任意)">
+<input id="progressTotal" type="number" min="1" placeholder="回数(任意)">
 
-<select id="date">
+<select id="deadlineType">
+
 <option value="today">今日</option>
-<option value="tomorrow">明日</option>
+<option value="week">今週</option>
+<option value="month">今月</option>
+<option value="3month">3ヶ月</option>
+<option value="6month">半年</option>
+<option value="year">今年</option>
+<option value="date">日付指定</option>
+
 </select>
 
-<button class="add" onclick="addTask()">追加</button>
+<input type="date" id="datePicker" style="display:none">
+
+<button onclick="addTask()">追加</button>
 
 </div>
 
 <div class="card">
 
 <h3>タスク</h3>
+
 <div id="taskList"></div>
 
 </div>
@@ -134,338 +135,425 @@ gap:6px;
 
 <div class="card">
 
-<h3>カテゴリ管理</h3>
+<h3>履歴</h3>
 
-<input id="newCategory" placeholder="カテゴリ名">
+<div id="history"></div>
 
-<button class="add" onclick="addCategory()">追加</button>
+<div class="toggle" onclick="toggleHistory()">▶ 履歴（全表示）</div>
 
-<div id="categoryList"></div>
+<div id="allHistory" style="display:none"></div>
+
+<button class="delete" onclick="clearHistory()">履歴削除</button>
 
 </div>
 
 <div class="card">
 
-<h3>バックアップ</h3>
+<h3>データ</h3>
 
-<button class="add" onclick="backup()">バックアップ</button>
+<button onclick="backup()">バックアップ</button>
 
-<input type="file" onchange="restore(event)">
+<input type="file" id="restoreFile">
 
-<br><br>
-
-<label>
-自動バックアップ
-<input type="checkbox" id="autoBackup">
-</label>
-
-<select id="backupInterval">
-
-<option value="1">1日</option>
-<option value="7">7日</option>
-<option value="30">30日</option>
-
-</select>
-
-</div>
+<button onclick="restore()">復元</button>
 
 </div>
 
 <script>
 
-let tasks = JSON.parse(localStorage.getItem("tasks")||"[]")
-let categories = JSON.parse(localStorage.getItem("categories")||"[]")
+const CAT_KEY="learning_cat_v7";
+const TASK_KEY="learning_task_v7";
+
+let categories=JSON.parse(localStorage.getItem(CAT_KEY))||[];
+let tasks=JSON.parse(localStorage.getItem(TASK_KEY))||[];
 
 function save(){
 
-localStorage.setItem("tasks",JSON.stringify(tasks))
-localStorage.setItem("categories",JSON.stringify(categories))
+localStorage.setItem(CAT_KEY,JSON.stringify(categories));
+localStorage.setItem(TASK_KEY,JSON.stringify(tasks));
+
+}
+
+function toggleCat(){
+
+let sec=document.getElementById("catSection");
+
+sec.style.display=sec.style.display==="none"?"block":"none";
+
+}
+
+function toggleHistory(){
+
+let sec=document.getElementById("allHistory");
+
+sec.style.display=sec.style.display==="none"?"block":"none";
 
 }
 
 function addCategory(){
 
-let name = document.getElementById("newCategory").value
+let name=document.getElementById("catInput").value.trim();
 
-if(!name)return
+if(!name)return;
 
-categories.push(name)
+categories.push(name);
 
-save()
+document.getElementById("catInput").value="";
 
-render()
+save();
+render();
+
+}
+
+function deleteCategory(i){
+
+if(!confirm("削除してよろしいですか？"))return;
+
+let name=categories[i];
+
+categories.splice(i,1);
+
+tasks=tasks.filter(t=>t.category!==name);
+
+save();
+render();
 
 }
 
 function addTask(){
 
-let name = document.getElementById("taskName").value
-let category = document.getElementById("category").value
-let limit = Number(document.getElementById("limit").value)
+let text=document.getElementById("taskInput").value.trim();
+let cat=document.getElementById("catSelect").value;
+let total=parseInt(document.getElementById("progressTotal").value);
 
-let dateSel = document.getElementById("date").value
+if(total<0) total=0;
 
-let date = new Date()
+let deadlineType=document.getElementById("deadlineType").value;
 
-if(dateSel==="tomorrow"){
-date.setDate(date.getDate()+1)
+let date=null;
+
+if(deadlineType==="date"){
+
+date=document.getElementById("datePicker").value;
+
 }
 
 tasks.push({
-name,
-category,
-limit:limit||null,
-done:0,
-date:date.toDateString()
-})
 
-save()
+text,
+category:cat,
+progress:0,
+total:isNaN(total)?null:total,
+done:false,
+deadlineType,
+date,
+created:new Date().toDateString()
 
-render()
+});
 
-}
+document.getElementById("taskInput").value="";
+document.getElementById("progressTotal").value="";
 
-function plusTask(i){
-
-let t=tasks[i]
-
-if(t.limit && t.done>=t.limit)return
-
-t.done++
-
-save()
-
-render()
+save();
+render();
 
 }
 
-function minusTask(i){
+document.getElementById("deadlineType").onchange=function(){
 
-let t=tasks[i]
+document.getElementById("datePicker").style.display=
+this.value==="date"?"inline":"none";
 
-if(t.done>0){
+};
 
-t.done--
+function progressTask(i){
 
-save()
+let t=tasks[i];
 
-render()
+if(t.total!==null && t.progress>=t.total)return;
+
+t.progress++;
+
+if(t.total!==null && t.progress>=t.total){
+
+t.done=true;
 
 }
+
+save();
+render();
 
 }
 
 function deleteTask(i){
 
-tasks.splice(i,1)
+if(!confirm("削除してよろしいですか？"))return;
 
-save()
+tasks.splice(i,1);
 
-render()
-
-}
-
-function render(){
-
-renderCategories()
-
-renderTasks()
-
-renderChart()
-
-renderToday()
+save();
+render();
 
 }
 
 function renderCategories(){
 
-let select=document.getElementById("category")
-select.innerHTML=""
+let div=document.getElementById("catList");
+
+div.innerHTML="";
+
+categories.forEach((c,i)=>{
+
+let d=document.createElement("div");
+
+d.innerHTML=c+" <button class='delete' onclick='deleteCategory("+i+")'>削除</button>";
+
+div.appendChild(d);
+
+});
+
+let sel=document.getElementById("catSelect");
+
+sel.innerHTML="";
 
 categories.forEach(c=>{
 
-let op=document.createElement("option")
-op.textContent=c
-select.appendChild(op)
+let o=document.createElement("option");
 
-})
+o.value=c;
+o.textContent=c;
+
+sel.appendChild(o);
+
+});
 
 }
 
 function renderTasks(){
 
-let box=document.getElementById("taskList")
+let div=document.getElementById("taskList");
 
-box.innerHTML=""
+div.innerHTML="";
 
 tasks.forEach((t,i)=>{
 
-box.innerHTML+=`
+let row=document.createElement("div");
 
-<div class="taskRow">
+row.className="task";
 
-<div>[${t.category}] ${t.name}</div>
+let label=t.text;
 
-<div class="taskButtons">
+if(t.total!==null){
 
-<button class="minus" onclick="minusTask(${i})">−</button>
-
-<span>${t.done}/${t.limit||"-"}</span>
-
-<button class="plus" onclick="plusTask(${i})">＋</button>
-
-<button class="delete" onclick="deleteTask(${i})">削除</button>
-
-</div>
-
-</div>
-
-`
-
-})
+label+=" ("+t.progress+"/"+t.total+")";
 
 }
 
-function renderToday(){
+let span=document.createElement("span");
 
-let box=document.getElementById("todayTasks")
+span.textContent="["+t.category+"] "+label;
 
-box.innerHTML=""
+if(t.done)span.className="done";
 
-let today=new Date().toDateString()
+let btn=document.createElement("button");
 
-tasks
-.filter(t=>t.date===today && (!t.limit || t.done<t.limit))
-.forEach(t=>{
+btn.textContent="＋";
 
-box.innerHTML+=`<div>・${t.name}</div>`
+btn.onclick=()=>progressTask(i);
 
-})
+let del=document.createElement("button");
+
+del.textContent="削除";
+del.className="delete";
+del.onclick=()=>deleteTask(i);
+
+row.appendChild(span);
+row.appendChild(btn);
+row.appendChild(del);
+
+div.appendChild(row);
+
+});
 
 }
-
-let chart
 
 function renderChart(){
 
-let map={}
+let data={};
+
+categories.forEach(c=>data[c]={done:0,total:0});
 
 tasks.forEach(t=>{
 
-if(!map[t.category]){
+if(!data[t.category])return;
 
-map[t.category]={done:0,total:0}
+data[t.category].total++;
+
+if(t.done)data[t.category].done++;
+
+});
+
+let labels=[];
+let values=[];
+let colors=[];
+
+for(let c in data){
+
+labels.push(c);
+
+let v=0;
+
+if(data[c].total>0){
+
+v=Math.round(data[c].done/data[c].total*100);
 
 }
 
-map[t.category].done+=t.done
+values.push(v);
 
-if(t.limit)map[t.category].total+=t.limit
+colors.push("hsl("+Math.random()*360+",70%,60%)");
 
-})
+}
 
-let labels=[]
-let data=[]
+let ctx=document.getElementById("chart");
 
-Object.keys(map).forEach(c=>{
+new Chart(ctx,{
 
-labels.push(c)
-
-let r=map[c]
-
-let v=r.total?Math.round(r.done/r.total*100):0
-
-data.push(v)
-
-})
-
-if(chart)chart.destroy()
-
-chart=new Chart(
-
-document.getElementById("chart"),
-
-{
 type:"bar",
+
 data:{
-labels,
+
+labels:labels,
+
 datasets:[{
+
 label:"達成率%",
-data
+
+data:values,
+
+backgroundColor:colors,
+
+barThickness:20
+
 }]
+
 },
+
 options:{
-scales:{
-y:{
-min:0,
-max:100,
-ticks:{
-callback:v=>v+"%"
+indexAxis:"y"
 }
-}
-}
-}
+
+});
 
 }
 
-)
+function renderHistory(){
+
+let div=document.getElementById("history");
+let all=document.getElementById("allHistory");
+
+div.innerHTML="";
+all.innerHTML="";
+
+let days={};
+
+tasks.forEach(t=>{
+
+if(!days[t.created])days[t.created]=[];
+
+days[t.created].push(t);
+
+});
+
+let arr=Object.keys(days);
+
+arr.slice(0,5).forEach(d=>{
+
+let el=document.createElement("div");
+
+el.textContent=d;
+
+div.appendChild(el);
+
+});
+
+arr.slice(5).forEach(d=>{
+
+let el=document.createElement("div");
+
+el.textContent=d;
+
+all.appendChild(el);
+
+});
+
+}
+
+function clearHistory(){
+
+if(!confirm("履歴削除してよろしいですか？"))return;
+
+tasks=[];
+
+save();
+render();
 
 }
 
 function backup(){
 
-let data=JSON.stringify({tasks,categories})
+let blob=new Blob([JSON.stringify({categories,tasks},null,2)],{type:"application/json"});
 
-let blob=new Blob([data])
+let a=document.createElement("a");
 
-let a=document.createElement("a")
+a.href=URL.createObjectURL(blob);
 
-a.href=URL.createObjectURL(blob)
+a.download="learning_backup.json";
 
-a.download="studyBackup.json"
-
-a.click()
+a.click();
 
 }
 
-function restore(e){
+function restore(){
 
-let file=e.target.files[0]
+let file=document.getElementById("restoreFile").files[0];
 
-let reader=new FileReader()
+if(!file)return;
 
-reader.onload=function(){
+let reader=new FileReader();
 
-let data=JSON.parse(reader.result)
+reader.onload=function(e){
 
-tasks=data.tasks
-categories=data.categories
+let d=JSON.parse(e.target.result);
 
-save()
+categories=d.categories||[];
+tasks=d.tasks||[];
 
-render()
+save();
+render();
 
-}
+};
 
-reader.readAsText(file)
-
-}
-
-function autoBackup(){
-
-let on=document.getElementById("autoBackup").checked
-
-if(!on)return
-
-let days=document.getElementById("backupInterval").value
-
-setInterval(backup,days*86400000)
+reader.readAsText(file);
 
 }
 
-setInterval(autoBackup,60000)
+function render(){
 
-render()
+renderCategories();
+renderTasks();
+renderChart();
+renderHistory();
+
+}
+
+render();
+
+if ("serviceWorker" in navigator) {
+
+navigator.serviceWorker.register("service-worker.js");
+
+}
 
 </script>
 
