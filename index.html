@@ -115,15 +115,15 @@ margin-top:20px;
 
 <script>
 
-let categories=JSON.parse(localStorage.getItem("categories"))||[];
-let tasks=JSON.parse(localStorage.getItem("tasks"))||[];
-let studyTime=JSON.parse(localStorage.getItem("studyTime"))||{};
+let learning_categories=JSON.parse(localStorage.getItem("learning_categories"))||[];
+let learning_tasks=JSON.parse(localStorage.getItem("learning_tasks"))||[];
+let learning_studyTime=JSON.parse(localStorage.getItem("learning_studyTime"))||{};
 
 function save(){
 
-localStorage.setItem("categories",JSON.stringify(categories));
-localStorage.setItem("tasks",JSON.stringify(tasks));
-localStorage.setItem("studyTime",JSON.stringify(studyTime));
+localStorage.setItem("learning_categories",JSON.stringify(categories));
+localStorage.setItem("learning_tasks",JSON.stringify(tasks));
+localStorage.setItem("learning_studyTime",JSON.stringify(studyTime));
 
 }
 
@@ -164,8 +164,8 @@ renderStats();
 
 function addTask(){
 
-let text=document.getElementById("taskInput").value.trim();
-let cat=document.getElementById("categorySelect").value;
+let text=document.getElementById("learning_taskInput").value.trim();
+let cat=document.getElementById("learning_categorySelect").value;
 
 if(text==="")return;
 
@@ -210,7 +210,7 @@ tasks[index].done=this.checked;
 
 if(this.checked){
 
-let cat=task.category;
+let cat=learning_task.learning_category;
 
 studyTime[cat]+=seconds;
 
@@ -235,7 +235,7 @@ del.textContent="削除";
 
 del.onclick=function(){
 
-tasks.splice(index,1);
+learning_tasks.splice(index,1);
 
 save();
 renderTasks();
@@ -323,9 +323,9 @@ updateTimer();
 function backupData(){
 
 let data={
-categories:categories,
-tasks:tasks,
-studyTime:studyTime
+learning_categories:learning_categories,
+learning_tasks:learning_tasks,
+learning_studyTime:learning_studyTime
 };
 
 let blob=new Blob(
@@ -354,9 +354,9 @@ reader.onload=function(e){
 
 let data=JSON.parse(e.target.result);
 
-categories=data.categories||[];
-tasks=data.tasks||[];
-studyTime=data.studyTime||{};
+learning_categories=data.learning_categories||[];
+learning_tasks=data.learning_tasks||[];
+learning_studyTime=data.learning_studyTime||{};
 
 save();
 updateCategorySelect();
