@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>勉強ToDo</title>
+
+<style>
+body{
+font-family:sans-serif;
+max-width:500px;
+margin:auto;
+padding:20px;
+background:#f5f5f5;
+}
+
+h1{
+text-align:center;
+}
+
+#todoInput{
+width:70%;
+padding:8px;
+}
+
+button{
+padding:8px;
+}
+
+li{
+background:white;
+margin:5px 0;
+padding:8px;
+border-radius:5px;
+}
+
+.completed{
+text-decoration:line-through;
+color:gray;
+}
+
+#progress{
+margin-top:20px;
+font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<h1>今日の勉強ToDo</h1>
+
+<input id="todoInput" placeholder="勉強タスクを書く">
+<button onclick="addTodo()">追加</button>
+
+<ul id="todoList"></ul>
+
+<div id="progress">達成率: 0%</div>
+
+<script>
+
+let todos = JSON.parse(localStorage.getItem("todos")) || [];
+
+function save(){
+localStorage.setItem("todos",JSON.stringify(todos));
+}
+
+function render(){
+
+let list=document.getElementById("todoList");
+list.innerHTML="";
+
+let completed=0;
+
+todos.forEach((todo,index)=>{
+
+let li=document.createElement("li");
+
+let checkbox=document.createElement("input");
+checkbox.type="checkbox";
+checkbox.checked=todo.done;
+
+checkbox.onchange=function(){
+todos[index].done=this.checked;
+save();
+render();
+}
+
+if(todo.done){
+li.classList.add("completed");
+completed++;
+}
+
+li.appendChild(checkbox);
+
+let text=document.createElement("span");
+text.textContent=" "+todo.text;
+
+li.appendChild(text);
+
+list.appendChild(li);
+
+});
+
+let percent=0;
+if(todos.length>0){
+percent=Math.round(completed/todos.length*100);
+}
+
+document.getElementById("progress").textContent="達成率: "+percent+"%";
+
+}
+
+function addTodo(){
+
+let input=document.getElementById("todoInput");
+let text=input.value.trim();
+
+if(text==="") return;
+
+todos.push({text:text,done:false});
+
+input.value="";
+
+save();
+render();
+
+}
+
+render();
+
+</script>
+
+</body>
+</html>
