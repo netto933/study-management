@@ -1,11 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>学習管理</title>
-
-<link rel="manifest" href="manifest.json">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -13,10 +11,9 @@
 
 body{
 font-family:sans-serif;
-max-width:720px;
-margin:auto;
-padding:15px;
-background:#f0f2f5;
+background:#f5f5f5;
+margin:0;
+padding:10px;
 }
 
 h1{
@@ -25,27 +22,40 @@ text-align:center;
 
 .card{
 background:white;
-padding:15px;
 border-radius:10px;
-margin-top:15px;
-box-shadow:0 2px 5px rgba(0,0,0,0.1);
+padding:15px;
+margin-bottom:15px;
+box-shadow:0 2px 6px rgba(0,0,0,0.1);
 }
 
 button{
-padding:6px 10px;
-margin:3px;
+padding:8px 12px;
 border:none;
 border-radius:6px;
-background:#4CAF50;
-color:white;
+margin:2px;
 }
 
-button.delete{
-background:#e74c3c;
+.add{background:#4CAF50;color:white}
+.del{background:#e74c3c;color:white}
+.ctrl{background:#3498db;color:white}
+
+.task{
+border:1px solid #ddd;
+border-radius:8px;
+padding:10px;
+margin:8px 0;
 }
 
-button.edit{
-background:#3498db;
+.row{
+display:flex;
+justify-content:space-between;
+align-items:center;
+flex-wrap:wrap;
+}
+
+input,select{
+padding:6px;
+margin:3px;
 }
 
 .toggle{
@@ -53,20 +63,11 @@ cursor:pointer;
 font-weight:bold;
 }
 
-.task{
-display:flex;
-align-items:center;
-justify-content:space-between;
-margin:5px 0;
-}
-
-.done{
-text-decoration:line-through;
-color:gray;
+.hidden{
+display:none;
 }
 
 </style>
-
 </head>
 
 <body>
@@ -74,14 +75,18 @@ color:gray;
 <h1>学習管理</h1>
 
 <div class="card">
+<h3>今日やるタスク</h3>
+<div id="todayTasks"></div>
+</div>
 
-<div class="toggle" onclick="toggleCat()">▶ カテゴリ管理</div>
+<div class="card">
 
-<div id="catSection" style="display:none">
+<div class="toggle" onclick="toggle('catBox')">＋カテゴリ管理</div>
 
-<input id="catInput" placeholder="カテゴリ">
+<div id="catBox" class="hidden">
 
-<button onclick="addCategory()">追加</button>
+<input id="newCat" placeholder="カテゴリ名">
+<button class="add" onclick="addCategory()">追加</button>
 
 <div id="catList"></div>
 
@@ -93,27 +98,27 @@ color:gray;
 
 <h3>タスク追加</h3>
 
-<select id="catSelect"></select>
+<select id="taskCat"></select>
 
-<input id="taskInput" placeholder="タスク">
+<input id="taskName" placeholder="タスク">
 
-<input id="progressTotal" type="number" min="1" placeholder="回数(任意)">
+<input id="taskCount" type="number" min="1" placeholder="回数(任意)">
 
-<select id="deadlineType">
+<select id="deadlineType" onchange="deadlineChange()">
 
-<option value="today">今日</option>
-<option value="week">今週</option>
-<option value="month">今月</option>
-<option value="3month">3ヶ月</option>
-<option value="6month">半年</option>
-<option value="year">今年</option>
-<option value="date">日付指定</option>
+<option>今日</option>
+<option>今週</option>
+<option>今月</option>
+<option>3ヶ月</option>
+<option>半年</option>
+<option>今年</option>
+<option>日付指定</option>
 
 </select>
 
-<input type="date" id="datePicker" style="display:none">
+<input type="date" id="deadlineDate" class="hidden">
 
-<button onclick="addTask()">追加</button>
+<button class="add" onclick="addTask()">追加</button>
 
 </div>
 
@@ -137,13 +142,13 @@ color:gray;
 
 <h3>履歴</h3>
 
-<div id="history"></div>
+<div id="history5"></div>
 
-<div class="toggle" onclick="toggleHistory()">▶ 履歴（全表示）</div>
+<div class="toggle" onclick="toggle('historyAll')">＋履歴（全表示）</div>
 
-<div id="allHistory" style="display:none"></div>
+<div id="historyAll" class="hidden"></div>
 
-<button class="delete" onclick="clearHistory()">履歴削除</button>
+<button class="del" onclick="clearHistory()">履歴削除</button>
 
 </div>
 
@@ -151,409 +156,313 @@ color:gray;
 
 <h3>データ</h3>
 
-<button onclick="backup()">バックアップ</button>
+<button class="add" onclick="backup()">バックアップ</button>
 
-<input type="file" id="restoreFile">
-
-<button onclick="restore()">復元</button>
+<input type="file" onchange="restore(event)">
 
 </div>
 
 <script>
 
-const CAT_KEY="learning_cat_v7";
-const TASK_KEY="learning_task_v7";
-
-let categories=JSON.parse(localStorage.getItem(CAT_KEY))||[];
-let tasks=JSON.parse(localStorage.getItem(TASK_KEY))||[];
+let data=JSON.parse(localStorage.getItem("study_v7"))||{
+categories:[],
+tasks:[],
+history:[]
+}
 
 function save(){
-
-localStorage.setItem(CAT_KEY,JSON.stringify(categories));
-localStorage.setItem(TASK_KEY,JSON.stringify(tasks));
-
+localStorage.setItem("study_v7",JSON.stringify(data))
+render()
 }
 
-function toggleCat(){
-
-let sec=document.getElementById("catSection");
-
-sec.style.display=sec.style.display==="none"?"block":"none";
-
+function toggle(id){
+let e=document.getElementById(id)
+e.classList.toggle("hidden")
 }
 
-function toggleHistory(){
-
-let sec=document.getElementById("allHistory");
-
-sec.style.display=sec.style.display==="none"?"block":"none";
-
+function deadlineChange(){
+let type=document.getElementById("deadlineType").value
+let date=document.getElementById("deadlineDate")
+date.classList.toggle("hidden",type!="日付指定")
 }
 
 function addCategory(){
-
-let name=document.getElementById("catInput").value.trim();
-
-if(!name)return;
-
-categories.push(name);
-
-document.getElementById("catInput").value="";
-
-save();
-render();
-
+let name=document.getElementById("newCat").value
+if(!name)return
+data.categories.push(name)
+document.getElementById("newCat").value=""
+save()
 }
 
 function deleteCategory(i){
-
-if(!confirm("削除してよろしいですか？"))return;
-
-let name=categories[i];
-
-categories.splice(i,1);
-
-tasks=tasks.filter(t=>t.category!==name);
-
-save();
-render();
-
+data.categories.splice(i,1)
+data.tasks=data.tasks.filter(t=>t.cat!=i)
+save()
 }
 
 function addTask(){
 
-let text=document.getElementById("taskInput").value.trim();
-let cat=document.getElementById("catSelect").value;
-let total=parseInt(document.getElementById("progressTotal").value);
+let cat=document.getElementById("taskCat").value
+let name=document.getElementById("taskName").value
+let count=parseInt(document.getElementById("taskCount").value)||null
+let type=document.getElementById("deadlineType").value
+let date=document.getElementById("deadlineDate").value
 
-if(total<0) total=0;
-
-let deadlineType=document.getElementById("deadlineType").value;
-
-let date=null;
-
-if(deadlineType==="date"){
-
-date=document.getElementById("datePicker").value;
-
-}
-
-tasks.push({
-
-text,
-category:cat,
+data.tasks.push({
+cat,
+name,
+count,
 progress:0,
-total:isNaN(total)?null:total,
-done:false,
-deadlineType,
-date,
-created:new Date().toDateString()
+deadline:type=="日付指定"?date:type
+})
 
-});
-
-document.getElementById("taskInput").value="";
-document.getElementById("progressTotal").value="";
-
-save();
-render();
+save()
 
 }
 
-document.getElementById("deadlineType").onchange=function(){
+function addProgress(i){
+let t=data.tasks[i]
 
-document.getElementById("datePicker").style.display=
-this.value==="date"?"inline":"none";
+if(t.count && t.progress>=t.count)return
 
-};
+t.progress++
 
-function progressTask(i){
+data.history.unshift({
+date:new Date().toLocaleDateString(),
+task:t.name
+})
 
-let t=tasks[i];
-
-if(t.total!==null && t.progress>=t.total)return;
-
-t.progress++;
-
-if(t.total!==null && t.progress>=t.total){
-
-t.done=true;
+save()
 
 }
 
-save();
-render();
+function minusProgress(i){
+
+let t=data.tasks[i]
+
+if(t.progress<=0)return
+
+t.progress--
+
+save()
 
 }
 
 function deleteTask(i){
 
-if(!confirm("削除してよろしいですか？"))return;
+data.tasks.splice(i,1)
 
-tasks.splice(i,1);
-
-save();
-render();
+save()
 
 }
 
-function renderCategories(){
+function moveTask(i,d){
 
-let div=document.getElementById("catList");
+let j=i+d
 
-div.innerHTML="";
+if(j<0||j>=data.tasks.length)return
 
-categories.forEach((c,i)=>{
+let tmp=data.tasks[i]
 
-let d=document.createElement("div");
+data.tasks[i]=data.tasks[j]
 
-d.innerHTML=c+" <button class='delete' onclick='deleteCategory("+i+")'>削除</button>";
+data.tasks[j]=tmp
 
-div.appendChild(d);
-
-});
-
-let sel=document.getElementById("catSelect");
-
-sel.innerHTML="";
-
-categories.forEach(c=>{
-
-let o=document.createElement("option");
-
-o.value=c;
-o.textContent=c;
-
-sel.appendChild(o);
-
-});
-
-}
-
-function renderTasks(){
-
-let div=document.getElementById("taskList");
-
-div.innerHTML="";
-
-tasks.forEach((t,i)=>{
-
-let row=document.createElement("div");
-
-row.className="task";
-
-let label=t.text;
-
-if(t.total!==null){
-
-label+=" ("+t.progress+"/"+t.total+")";
-
-}
-
-let span=document.createElement("span");
-
-span.textContent="["+t.category+"] "+label;
-
-if(t.done)span.className="done";
-
-let btn=document.createElement("button");
-
-btn.textContent="＋";
-
-btn.onclick=()=>progressTask(i);
-
-let del=document.createElement("button");
-
-del.textContent="削除";
-del.className="delete";
-del.onclick=()=>deleteTask(i);
-
-row.appendChild(span);
-row.appendChild(btn);
-row.appendChild(del);
-
-div.appendChild(row);
-
-});
-
-}
-
-function renderChart(){
-
-let data={};
-
-categories.forEach(c=>data[c]={done:0,total:0});
-
-tasks.forEach(t=>{
-
-if(!data[t.category])return;
-
-data[t.category].total++;
-
-if(t.done)data[t.category].done++;
-
-});
-
-let labels=[];
-let values=[];
-let colors=[];
-
-for(let c in data){
-
-labels.push(c);
-
-let v=0;
-
-if(data[c].total>0){
-
-v=Math.round(data[c].done/data[c].total*100);
-
-}
-
-values.push(v);
-
-colors.push("hsl("+Math.random()*360+",70%,60%)");
-
-}
-
-let ctx=document.getElementById("chart");
-
-new Chart(ctx,{
-
-type:"bar",
-
-data:{
-
-labels:labels,
-
-datasets:[{
-
-label:"達成率%",
-
-data:values,
-
-backgroundColor:colors,
-
-barThickness:20
-
-}]
-
-},
-
-options:{
-indexAxis:"y"
-}
-
-});
-
-}
-
-function renderHistory(){
-
-let div=document.getElementById("history");
-let all=document.getElementById("allHistory");
-
-div.innerHTML="";
-all.innerHTML="";
-
-let days={};
-
-tasks.forEach(t=>{
-
-if(!days[t.created])days[t.created]=[];
-
-days[t.created].push(t);
-
-});
-
-let arr=Object.keys(days);
-
-arr.slice(0,5).forEach(d=>{
-
-let el=document.createElement("div");
-
-el.textContent=d;
-
-div.appendChild(el);
-
-});
-
-arr.slice(5).forEach(d=>{
-
-let el=document.createElement("div");
-
-el.textContent=d;
-
-all.appendChild(el);
-
-});
-
-}
-
-function clearHistory(){
-
-if(!confirm("履歴削除してよろしいですか？"))return;
-
-tasks=[];
-
-save();
-render();
+save()
 
 }
 
 function backup(){
 
-let blob=new Blob([JSON.stringify({categories,tasks},null,2)],{type:"application/json"});
+let blob=new Blob([JSON.stringify(data)],{type:"application/json"})
 
-let a=document.createElement("a");
+let a=document.createElement("a")
 
-a.href=URL.createObjectURL(blob);
+a.href=URL.createObjectURL(blob)
 
-a.download="learning_backup.json";
+a.download="study_backup.json"
 
-a.click();
+a.click()
 
 }
 
-function restore(){
+function restore(e){
 
-let file=document.getElementById("restoreFile").files[0];
+let file=e.target.files[0]
 
-if(!file)return;
+let reader=new FileReader()
 
-let reader=new FileReader();
+reader.onload=()=>{
 
-reader.onload=function(e){
+data=JSON.parse(reader.result)
 
-let d=JSON.parse(e.target.result);
+save()
 
-categories=d.categories||[];
-tasks=d.tasks||[];
+}
 
-save();
-render();
+reader.readAsText(file)
 
-};
+}
 
-reader.readAsText(file);
+function clearHistory(){
+
+data.history=[]
+
+save()
 
 }
 
 function render(){
 
-renderCategories();
-renderTasks();
-renderChart();
-renderHistory();
+let catSel=document.getElementById("taskCat")
+
+catSel.innerHTML=""
+
+data.categories.forEach((c,i)=>{
+catSel.innerHTML+=`<option value="${i}">${c}</option>`
+})
+
+let catList=document.getElementById("catList")
+
+catList.innerHTML=""
+
+data.categories.forEach((c,i)=>{
+catList.innerHTML+=`${c} <button class="del" onclick="deleteCategory(${i})">削除</button><br>`
+})
+
+let taskList=document.getElementById("taskList")
+
+taskList.innerHTML=""
+
+data.tasks.forEach((t,i)=>{
+
+let cat=data.categories[t.cat]
+
+taskList.innerHTML+=`
+
+<div class="task">
+
+<b>${cat}</b><br>
+
+${t.name}
+
+<br>
+
+${t.progress}${t.count?"/"+t.count:""}
+
+<br>
+
+<button class="ctrl" onclick="minusProgress(${i})">-</button>
+
+<button class="add" onclick="addProgress(${i})">+</button>
+
+<button onclick="moveTask(${i},-1)">↑</button>
+<button onclick="moveTask(${i},1)">↓</button>
+
+<button class="del" onclick="deleteTask(${i})">削除</button>
+
+</div>
+
+`
+
+})
+
+renderChart()
+
+renderHistory()
+
+renderToday()
 
 }
 
-render();
+function renderToday(){
 
-if ("serviceWorker" in navigator) {
+let box=document.getElementById("todayTasks")
 
-navigator.serviceWorker.register("service-worker.js");
+box.innerHTML=""
+
+data.tasks.forEach(t=>{
+
+if(t.deadline=="今日"){
+box.innerHTML+=`${t.name}<br>`
+}
+
+})
 
 }
+
+function renderHistory(){
+
+let h5=document.getElementById("history5")
+
+let hall=document.getElementById("historyAll")
+
+h5.innerHTML=""
+hall.innerHTML=""
+
+data.history.slice(0,5).forEach(h=>{
+h5.innerHTML+=`${h.date} ${h.task}<br>`
+})
+
+data.history.forEach(h=>{
+hall.innerHTML+=`${h.date} ${h.task}<br>`
+})
+
+}
+
+function renderChart(){
+
+let catData={}
+
+data.tasks.forEach(t=>{
+
+let cat=data.categories[t.cat]
+
+if(!catData[cat])catData[cat]={done:0,total:0}
+
+catData[cat].done+=t.progress
+catData[cat].total+=t.count||1
+
+})
+
+let labels=[]
+let values=[]
+
+for(let c in catData){
+
+labels.push(c)
+
+values.push(Math.round(catData[c].done/catData[c].total*100))
+
+}
+
+new Chart(document.getElementById("chart"),{
+
+type:"bar",
+
+data:{
+labels:labels,
+datasets:[{
+label:"達成率%",
+data:values
+}]
+},
+
+options:{
+indexAxis:'y',
+scales:{
+x:{
+min:0,
+max:100
+}
+}
+}
+
+})
+
+}
+
+render()
 
 </script>
 
